@@ -1,6 +1,5 @@
-using System;
 using Confluent.Kafka;
-using System.Collections;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
@@ -9,7 +8,7 @@ using UnityEngine;
 
 public class KafkaConnect : MonoBehaviour
 {
-    ConsumerConfig config = new ConsumerConfig
+    ConsumerConfig _config = new ConsumerConfig
     {
         GroupId = "test-consumer-group",
         BootstrapServers = "192.168.1.102:9092",
@@ -30,25 +29,20 @@ public class KafkaConnect : MonoBehaviour
 
     private void OnDisable()
     {
-        cts?.Cancel();
-    }
-
-    // Start is called before the first frame update
-    void Start()
-    {
+        CancelConnect();
     }
         
     [ContextMenu("Connect Kafka")]
-    private void testConnect()=> Connect(config, storageKafka);
+    public void TestConnect()=> _=Connect(_config, storageKafka);
 
     [ContextMenu("Disconnect Kafka")]
-    private void cancelConnect() => cts?.Cancel();
+    public void CancelConnect() => _cts?.Cancel();
     
     // https://github.com/confluentinc/confluent-kafka-dotnet#basic-consumer-example
-    private CancellationTokenSource cts;
+    private CancellationTokenSource _cts;
     async Task Connect(ConsumerConfig conf, StorageKafka storage)
     {
-        Debug.LogFormat("KafkaConnect.Connect:{0}", conf, storage);
+        Debug.LogFormat("KafkaConnect.Connect:{0} {1}", conf, storage);
         storage.Init();
         
         using (var c = new ConsumerBuilder<Ignore, string>(conf).Build())
@@ -59,7 +53,7 @@ public class KafkaConnect : MonoBehaviour
                 Debug.LogFormat("KafkaConnect.Connect Subscribe:{0}", top);
             }
 
-            cts = new CancellationTokenSource();
+            _cts = new CancellationTokenSource();
 
             try
             {
@@ -67,7 +61,7 @@ public class KafkaConnect : MonoBehaviour
                 {
                     try
                     {
-                        var cr = await Task.Run(() => c.Consume(cts.Token));//var cr = c.Consume(cts.Token);
+                        var cr = await Task.Run(() => c.Consume(_cts.Token));//var cr = c.Consume(_cts.Token);
                         Debug.LogFormat("KafkaConnect.Connect Consumed message: {0} {1} {2} {3}", cr.Topic, cr.Offset, cr.Message.Timestamp.UtcDateTime, cr.Message.Value);
                         storage.Insert(cr.Topic, cr);
                     }
@@ -95,13 +89,13 @@ public class KafkaConnect : MonoBehaviour
 public class StorageKafka
 {
     public List<string> topics;
-    private Dictionary<string, Queue<ConsumeResult<Ignore, string>>> storages;
+    private Dictionary<string, Queue<ConsumeResult<Ignore, string>>> _storages;
     public void Insert(string topic, ConsumeResult<Ignore, string> message)
     {
-        if (storages == null || !storages.ContainsKey(topic))
+        if (_storages == null || !_storages.ContainsKey(topic))
             return;
         
-        storages[topic].Enqueue(message);
+        _storages[topic].Enqueue(message);
     }
 
     public void Init()
@@ -109,31 +103,31 @@ public class StorageKafka
         if (topics == null || topics.Count == 0)
             return;
         
-        storages = new Dictionary<string, Queue<ConsumeResult<Ignore, string>>>();
+        _storages = new Dictionary<string, Queue<ConsumeResult<Ignore, string>>>();
         foreach (var topic in topics)
         {
-            if (storages.ContainsKey(topic))
+            if (_storages.ContainsKey(topic))
                 continue;
-            storages[topic] = new Queue<ConsumeResult<Ignore, string>>();
+            _storages[topic] = new Queue<ConsumeResult<Ignore, string>>();
         }
     }
     
-    private StringBuilder sb = new StringBuilder();
+    private StringBuilder _sb = new StringBuilder();
     public override string ToString()
     {
-        if (storages == null)
+        if (_storages == null)
             return "";
 
-        sb.Clear();
-        foreach (var kvp in storages)
+        _sb.Clear();
+        foreach (var kvp in _storages)
         {
-            sb.AppendFormat("Key:{0} Cnt:{1}\n", kvp.Key, kvp.Value.Count);
+            _sb.AppendFormat("Key:{0} Cnt:{1}\n", kvp.Key, kvp.Value.Count);
             if (kvp.Value.Count == 0)
                 continue;
             foreach(var val in kvp.Value.ToArray())
-                sb.AppendFormat("Val:{0} ", val.Message.Value);
+                _sb.AppendFormat("Val:{0} ", val.Message.Value);
         }
 
-        return sb.ToString();
+        return _sb.ToString();
     }
 }
